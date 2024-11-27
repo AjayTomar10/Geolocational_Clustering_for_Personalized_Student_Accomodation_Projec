@@ -3,48 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Accommodation Map</title>
-    <link rel="stylesheet" href="static/style.css">
+    <title>Search Apartments</title>
 </head>
 <body>
-    <div class="container">
-        <h1>Find Nearby Accommodation</h1>
-        <form id="location-form">
-            <label for="latitude">Latitude:</label>
-            <input type="text" id="latitude" name="latitude" placeholder="Enter latitude" required>
-            <label for="longitude">Longitude:</label>
-            <input type="text" id="longitude" name="longitude" placeholder="Enter longitude" required>
-            <button type="submit">Show Map</button>
-        </form>
-        <div id="map-container">
-            <iframe id="map" src="" title="Accommodation Map"></iframe>
-        </div>
-    </div>
+    <h1>Search Nearby Apartments</h1>
+    <form id="search-form">
+        <label for="latitude">Latitude:</label>
+        <input type="text" id="latitude" name="latitude" required>
+        <br><br>
+        <label for="longitude">Longitude:</label>
+        <input type="text" id="longitude" name="longitude" required>
+        <br><br>
+        <button type="submit">Search</button>
+    </form>
+    <p id="status"></p>
 
     <script>
-        document.getElementById('location-form').onsubmit = async (e) => {
+        document.getElementById('search-form').addEventListener('submit', function(e) {
             e.preventDefault();
-            const lat = document.getElementById('latitude').value;
-            const lng = document.getElementById('longitude').value;
-    
-            const response = await fetch('/api/map', {
+
+            const latitude = document.getElementById('latitude').value;
+            const longitude = document.getElementById('longitude').value;
+
+            fetch('/search', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ latitude: lat, longitude: lng })
-            });
-    
-            if (response.ok) {
-                const result = await response.json();
-                if (result.message === 'Map generated successfully') {
-                    document.getElementById('map').src = '/map?timestamp=' + new Date().getTime(); // Load dynamically
-                    alert('Map generated successfully');
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `latitude=${latitude}&longitude=${longitude}`,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('status').innerHTML = 'Search complete! <a href="/map" target="_blank">View Map</a>';
                 }
-            } else {
-                alert('Error: Could not fetch data');
-            }
-        };
+            });
+        });
     </script>
-    
-    
 </body>
 </html>
