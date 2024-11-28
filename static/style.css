@@ -39,7 +39,7 @@ label {
   text-align: left;
 }
 
-input[type="text"] {
+input[type="text"], #preference1, #preference2 {
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 4px;

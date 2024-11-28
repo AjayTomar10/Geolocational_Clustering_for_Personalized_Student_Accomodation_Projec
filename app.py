@@ -4,6 +4,7 @@ import folium
 from geopy.distance import geodesic
 import pandas as pd
 from sklearn.cluster import KMeans
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 
@@ -16,6 +17,18 @@ VERSION = '20180604'
 def index():
     return render_template('index.html')
 
+def fetch_foursquare_data(lat, lng, query, radius, limit=50):
+    """Fetch data from Foursquare API for a specific query."""
+    url = (
+        f'https://api.foursquare.com/v2/venues/search'
+        f'?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}'
+        f'&ll={lat},{lng}&v={VERSION}&query={query}&radius={radius}&limit={limit}'
+    )
+    response = requests.get(url)
+    if response.status_code == 200:
+        return len(response.json()['response']['venues'])
+    return 0
+
 @app.route('/search', methods=['POST'])
 def search():
     latitude = float(request.form['latitude'])
@@ -24,77 +37,63 @@ def search():
     # Search for apartments
     search_query = 'Apartment'
     radius = 18000  # 18km radius
-    LIMIT = 200
-    url = f'https://api.foursquare.com/v2/venues/search?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&ll={latitude},{longitude}&v={VERSION}&query={search_query}&radius={radius}&limit={LIMIT}'
+    LIMIT = 50
+    url = (
+        f'https://api.foursquare.com/v2/venues/search?client_id={CLIENT_ID}'
+        f'&client_secret={CLIENT_SECRET}&ll={latitude},{longitude}&v={VERSION}'
+        f'&query={search_query}&radius={radius}&limit={LIMIT}'
+    )
     results = requests.get(url).json()
     venues = results['response']['venues']
     dataframe = pd.json_normalize(venues)
 
-    # Filter columns
-    filtered_columns = ['name', 'categories'] + [col for col in dataframe.columns if col.startswith('location.')] + ['id']
-    dataframe_filtered = dataframe.loc[:, filtered_columns]
+    # Extract necessary columns
+    dataframe['lat'] = dataframe['location.lat']
+    dataframe['lng'] = dataframe['location.lng']
+    dataframe = dataframe[['name', 'lat', 'lng']]
 
-    # Extract category
-    def get_category_type(row):
-        try:
-            categories_list = row['categories']
-        except:
-            categories_list = row['venue.categories']
-        if len(categories_list) == 0:
-            return None
-        else:
-            return categories_list[0]['name']
-
-    dataframe_filtered['categories'] = dataframe_filtered.apply(get_category_type, axis=1)
-    dataframe_filtered.columns = [column.split('.')[-1] for column in dataframe_filtered.columns]
-
-    # Drop unwanted columns
-    dataframe_filtered.drop(['cc', 'country', 'state', 'city', 'neighborhood'], axis=1, inplace=True, errors='ignore')
-
-    # Calculate distances and cluster
-    df_evaluate = dataframe_filtered[['lat', 'lng']].copy()
+    # Use ThreadPoolExecutor for concurrent Foursquare API requests
     RestList = []
     FruitList = []
-    for lat, lng in zip(dataframe_filtered['lat'], dataframe_filtered['lng']):
-        # Count nearby restaurants
-        search_query = 'Restaurant'
-        url = f'https://api.foursquare.com/v2/venues/search?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&ll={lat},{lng}&v={VERSION}&query={search_query}&radius=5000&limit={LIMIT}'
-        results = requests.get(url).json()
-        RestList.append(len(results['response']['venues']))
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        restaurant_tasks = [
+            executor.submit(fetch_foursquare_data, lat, lng, 'Restaurant', 5000)
+            for lat, lng in zip(dataframe['lat'], dataframe['lng'])
+        ]
+        grocery_tasks = [
+            executor.submit(fetch_foursquare_data, lat, lng, 'Fruit', 5000)
+            for lat, lng in zip(dataframe['lat'], dataframe['lng'])
+        ]
+        RestList = [task.result() for task in restaurant_tasks]
+        FruitList = [task.result() for task in grocery_tasks]
 
-        # Count nearby grocery/fruit stores
-        search_query = 'Fruit'
-        url = f'https://api.foursquare.com/v2/venues/search?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&ll={lat},{lng}&v={VERSION}&query={search_query}&radius=5000&limit={LIMIT}'
-        results = requests.get(url).json()
-        FruitList.append(len(results['response']['venues']))
-
-    df_evaluate['Restaurants'] = RestList
-    df_evaluate['Groceries'] = FruitList
+    dataframe['Restaurants'] = RestList
+    dataframe['Groceries'] = FruitList
 
     # Clustering
-    kmeans = KMeans(n_clusters=3, random_state=0).fit(df_evaluate)
-    df_evaluate['Cluster'] = kmeans.labels_.astype(str)
+    kmeans = KMeans(n_clusters=3, random_state=0).fit(dataframe[['lat', 'lng', 'Restaurants', 'Groceries']])
+    dataframe['Cluster'] = kmeans.labels_.astype(str)
 
     # Map generation
     map_bang = folium.Map(location=[latitude, longitude], zoom_start=12)
     folium.Marker([latitude, longitude], popup="Your Location", icon=folium.Icon(color="red")).add_to(map_bang)
 
     def color_producer(cluster):
-        if cluster == '0':
-            return 'green'
-        elif cluster == '1':
-            return 'orange'
-        else:
-            return 'red'
+        return ['green', 'orange', 'red'][int(cluster)]
 
-    for i, row in dataframe_filtered.iterrows():
+    for _, row in dataframe.iterrows():
+        apartment_location = (row['lat'], row['lng'])
+        distance = geodesic((latitude, longitude), apartment_location).kilometers
+        popup_content = f"<b>{row['name']}</b><br>Distance: {distance:.2f} km"
+        popup = folium.Popup(popup_content, max_width=200, min_width=150)
+
         folium.CircleMarker(
             [row['lat'], row['lng']],
             fill=True,
             fill_opacity=1,
-            popup=row['name'],
+            popup=popup,
             radius=5,
-            color=color_producer(df_evaluate.iloc[i]['Cluster'])
+            color=color_producer(row['Cluster'])
         ).add_to(map_bang)
 
     # Save map to an HTML file
@@ -107,4 +106,4 @@ def display_map():
     return render_template('map.html')
 
 if __name__ == '__main__':
-    app.run(debug=True,port=5001)
+    app.run(debug=True, port=5001)
