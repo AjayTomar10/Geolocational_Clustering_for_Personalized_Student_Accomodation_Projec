@@ -21,21 +21,17 @@
             <label for="preference1">Preference 1:</label>
             <select id="preference1" name="preference1" required>
                 <option value="">Select Preference</option>
-                <option value="Gym">Gym</option>
                 <option value="Restaurants">Restaurants</option>
-                <option value="Fruits">Fruits</option>
                 <option value="Groceries">Groceries</option>
-                <option value="Others">Others</option>
+                <option value="Gyms">Gyms</option>
             </select>
             
             <label for="preference2">Preference 2:</label>
             <select id="preference2" name="preference2" required>
                 <option value="">Select Preference</option>
-                <option value="Gym">Gym</option>
                 <option value="Restaurants">Restaurants</option>
-                <option value="Fruits">Fruits</option>
                 <option value="Groceries">Groceries</option>
-                <option value="Others">Others</option>
+                <option value="Gyms">Gyms</option>
             </select>
             
             <button type="submit">Search</button>
@@ -52,32 +48,32 @@
 
             const latitude = document.getElementById('latitude').value;
             const longitude = document.getElementById('longitude').value;
+            const preference1 = document.getElementById('preference1').value;
+            const preference2 = document.getElementById('preference2').value;
 
             try {
                 const response = await fetch('/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `latitude=${latitude}&longitude=${longitude}`,
+                    body: `latitude=${latitude}&longitude=${longitude}&preference1=${preference1}&preference2=${preference2}`,
                 });
 
                 if (response.ok) {
                     const result = await response.json();
                     if (result.status === 'success') {
-                        // Update the iframe's src to show the map dynamically
-                        document.getElementById('map').src = `/map?latitude=${latitude}&longitude=${longitude}`;
-                        alert('Map generated successfully'); // Success message
+                        document.getElementById('map').src = `/map`;
+                        alert('Map generated successfully');
                     } else {
-                        alert('Error: Could not generate the map'); // Error message for server-side issues
+                        alert(result.message || 'Error generating map');
                     }
                 } else {
-                    alert('Error: Could not fetch data'); // Error message for response issues
+                    alert('Error: Could not fetch data');
                 }
             } catch (error) {
-                alert('Error: Something went wrong'); // Error message for unexpected issues
+                alert('Error: Something went wrong');
                 console.error(error);
             }
         };
-
     </script>
 </body>
 

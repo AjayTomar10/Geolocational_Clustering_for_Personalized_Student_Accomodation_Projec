@@ -33,16 +33,24 @@ def fetch_foursquare_data(lat, lng, query, radius, limit=50):
 def search():
     latitude = float(request.form['latitude'])
     longitude = float(request.form['longitude'])
+    preference1 = request.form['preference1']
+    preference2 = request.form['preference2']
+
+    # Collect preferences
+    preferences = [preference1, preference2]
+    available_preferences = {'Restaurants': 'Restaurant', 'Groceries': 'Fruit', 'Gyms': 'Gym'}
+    valid_preferences = [pref for pref in preferences if pref in available_preferences]
+
+    if not valid_preferences:
+        return jsonify({'status': 'error', 'message': 'Invalid preferences selected'})
 
     # Search for apartments
     search_query = 'Apartment'
-    radius = 18000  # 18km radius
+    radius = 18000
     LIMIT = 50
-    url = (
-        f'https://api.foursquare.com/v2/venues/search?client_id={CLIENT_ID}'
-        f'&client_secret={CLIENT_SECRET}&ll={latitude},{longitude}&v={VERSION}'
-        f'&query={search_query}&radius={radius}&limit={LIMIT}'
-    )
+    url = (f'https://api.foursquare.com/v2/venues/search?client_id={CLIENT_ID}'
+           f'&client_secret={CLIENT_SECRET}&ll={latitude},{longitude}&v={VERSION}'
+           f'&query={search_query}&radius={radius}&limit={LIMIT}')
     results = requests.get(url).json()
     venues = results['response']['venues']
     dataframe = pd.json_normalize(venues)
@@ -52,27 +60,39 @@ def search():
     dataframe['lng'] = dataframe['location.lng']
     dataframe = dataframe[['name', 'lat', 'lng']]
 
-    # Use ThreadPoolExecutor for concurrent Foursquare API requests
-    RestList = []
-    FruitList = []
+    # Use ThreadPoolExecutor for concurrent API requests based on preferences
+    preference_data = {pref: [] for pref in valid_preferences}
     with ThreadPoolExecutor(max_workers=10) as executor:
-        restaurant_tasks = [
-            executor.submit(fetch_foursquare_data, lat, lng, 'Restaurant', 5000)
-            for lat, lng in zip(dataframe['lat'], dataframe['lng'])
-        ]
-        grocery_tasks = [
-            executor.submit(fetch_foursquare_data, lat, lng, 'Fruit', 5000)
-            for lat, lng in zip(dataframe['lat'], dataframe['lng'])
-        ]
-        RestList = [task.result() for task in restaurant_tasks]
-        FruitList = [task.result() for task in grocery_tasks]
+        tasks = {
+            pref: [
+                executor.submit(fetch_foursquare_data, lat, lng, available_preferences[pref], 5000)
+                for lat, lng in zip(dataframe['lat'], dataframe['lng'])
+            ]
+            for pref in valid_preferences
+        }
+        for pref, task_list in tasks.items():
+            preference_data[pref] = [task.result() for task in task_list]
 
-    dataframe['Restaurants'] = RestList
-    dataframe['Groceries'] = FruitList
+    # Add preference data to the DataFrame
+    for pref in valid_preferences:
+        dataframe[pref] = preference_data[pref]
 
-    # Clustering
-    kmeans = KMeans(n_clusters=3, random_state=0).fit(dataframe[['lat', 'lng', 'Restaurants', 'Groceries']])
+    # Clustering based on selected preferences
+    clustering_columns = ['lat', 'lng'] + valid_preferences
+    kmeans = KMeans(n_clusters=3, random_state=0).fit(dataframe[clustering_columns])
     dataframe['Cluster'] = kmeans.labels_.astype(str)
+
+    # Fetch Metro Stations
+    metro_url = (
+        f'https://api.foursquare.com/v2/venues/search?client_id={CLIENT_ID}'
+        f'&client_secret={CLIENT_SECRET}&ll={latitude},{longitude}&v={VERSION}'
+        f'&query=Metro Station&radius={radius}&limit={LIMIT}'
+    )
+    metro_response = requests.get(metro_url)
+    metro_stations = []
+    if metro_response.status_code == 200:
+        metro_data = metro_response.json()['response']['venues']
+        metro_stations = pd.json_normalize(metro_data)[['name', 'location.lat', 'location.lng']]
 
     # Map generation
     map_bang = folium.Map(location=[latitude, longitude], zoom_start=12)
@@ -81,6 +101,7 @@ def search():
     def color_producer(cluster):
         return ['green', 'orange', 'red'][int(cluster)]
 
+    # Add apartment markers
     for _, row in dataframe.iterrows():
         apartment_location = (row['lat'], row['lng'])
         distance = geodesic((latitude, longitude), apartment_location).kilometers
@@ -95,6 +116,14 @@ def search():
             radius=5,
             color=color_producer(row['Cluster'])
         ).add_to(map_bang)
+
+    # Add metro station markers
+    for _, metro in metro_stations.iterrows():
+        folium.Marker(
+        [metro['location.lat'], metro['location.lng']],
+        popup=f"<b>Metro Station: {metro['name']}</b>",
+        icon=folium.Icon(color="blue", icon="info-sign")
+    ).add_to(map_bang)
 
     # Save map to an HTML file
     map_bang.save('templates/map.html')
