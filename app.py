@@ -38,7 +38,21 @@ def search():
 
     # Collect preferences
     preferences = [preference1, preference2]
-    available_preferences = {'Restaurants': 'Restaurant', 'Groceries': 'Fruit', 'Gyms': 'Gym'}
+    available_preferences = {
+    'Restaurants': 'Restaurant',
+    'Groceries': 'Fruit',
+    'Gyms': 'Gym',
+    'Cafes': 'Cafes',
+    'Parks': 'Park',
+    'Hospitals': 'Hospital',
+    'Schools': 'School',
+    'Shopping Malls': 'Mall',
+    'Banks/ATMs': 'Bank',
+    'Libraries': 'Library',
+    'Pet Stores': 'Pet Store',
+    'Pharmacies': 'Pharmacy',
+    'Fitness Studios': 'Fitness'
+}
     valid_preferences = [pref for pref in preferences if pref in available_preferences]
 
     if not valid_preferences:
@@ -128,7 +142,12 @@ def search():
     # Save map to an HTML file
     map_bang.save('templates/map.html')
 
-    return jsonify({'status': 'success'})
+    response_data = {
+        "status": "success",
+        "data": dataframe.to_dict(orient='records')  # Converts the dataframe to a list of dictionaries
+    }
+    
+    return jsonify(response_data)
 
 @app.route('/map')
 def display_map():
