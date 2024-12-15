@@ -29,13 +29,15 @@ def fetch_foursquare_data(lat, lng, query, radius, limit=50):
         return len(response.json()['response']['venues'])
     return 0
 
-@app.route('/search', methods=['POST'])
+@app.route('/search', methods=['GET','POST'])
 def search():
+    
     latitude = float(request.form['latitude'])
     longitude = float(request.form['longitude'])
     preference1 = request.form['preference1']
     preference2 = request.form['preference2']
-
+    display_metro = request.form['display_metro'] 
+    
     # Collect preferences
     preferences = [preference1, preference2]
     available_preferences = {
@@ -96,17 +98,9 @@ def search():
     kmeans = KMeans(n_clusters=3, random_state=0).fit(dataframe[clustering_columns])
     dataframe['Cluster'] = kmeans.labels_.astype(str)
 
-    # Fetch Metro Stations
-    metro_url = (
-        f'https://api.foursquare.com/v2/venues/search?client_id={CLIENT_ID}'
-        f'&client_secret={CLIENT_SECRET}&ll={latitude},{longitude}&v={VERSION}'
-        f'&query=Metro Station&radius={radius}&limit={LIMIT}'
-    )
-    metro_response = requests.get(metro_url)
-    metro_stations = []
-    if metro_response.status_code == 200:
-        metro_data = metro_response.json()['response']['venues']
-        metro_stations = pd.json_normalize(metro_data)[['name', 'location.lat', 'location.lng']]
+    
+    
+    
 
     # Map generation
     map_bang = folium.Map(location=[latitude, longitude], zoom_start=12)
@@ -131,13 +125,26 @@ def search():
             color=color_producer(row['Cluster'])
         ).add_to(map_bang)
 
-    # Add metro station markers
-    for _, metro in metro_stations.iterrows():
-        folium.Marker(
-        [metro['location.lat'], metro['location.lng']],
-        popup=f"<b>Metro Station: {metro['name']}</b>",
-        icon=folium.Icon(color="blue", icon="info-sign")
-    ).add_to(map_bang)
+    if(display_metro=="yes"):
+            # Fetch Metro Stations
+        metro_url = (
+            f'https://api.foursquare.com/v2/venues/search?client_id={CLIENT_ID}'
+            f'&client_secret={CLIENT_SECRET}&ll={latitude},{longitude}&v={VERSION}'
+            f'&query=Metro Station&radius={radius}&limit={LIMIT}'
+        )
+        metro_response = requests.get(metro_url)
+        metro_stations = []
+        if metro_response.status_code == 200:
+            metro_data = metro_response.json()['response']['venues']
+            metro_stations = pd.json_normalize(metro_data)[['name', 'location.lat', 'location.lng']]
+
+        # Add metro station markers
+        for _, metro in metro_stations.iterrows():
+            folium.Marker(
+            [metro['location.lat'], metro['location.lng']],
+            popup=f"<b>Metro Station: {metro['name']}</b>",
+            icon=folium.Icon(color="blue", icon="info-sign")
+        ).add_to(map_bang)
 
     # Save map to an HTML file
     map_bang.save('templates/map.html')

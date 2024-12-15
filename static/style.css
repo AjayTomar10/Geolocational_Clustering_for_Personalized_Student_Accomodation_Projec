@@ -159,6 +159,42 @@ iframe {
   }
 }
 
+.button-group {
+  display: flex;
+  gap: 10px;
+  justify-content: start;
+}
+
+.metro-button {
+  padding: 12px 20px;
+  border: 2px solid #007bff;
+  background-color: white;
+  color: #007bff;
+  font-size: 1em;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.metro-button:hover {
+  background-color: #007bff;
+  color: white;
+  box-shadow: 0 0 10px rgba(0, 123, 255, 0.5); /* Blue glow effect */
+}
+
+.metro-button:focus {
+  outline: none; /* Remove default outline */
+}
+
+.metro-button.active {
+  background-color: #007bff;
+  color: white;
+  box-shadow: 0 0 10px rgba(0, 123, 255, 0.8); /* Blue glow when clicked */
+}
+.hidden {
+  display: none;
+}
+
 
 
 

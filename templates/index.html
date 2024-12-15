@@ -28,7 +28,7 @@
 
     <div class="container">
         <h1>Search Nearby Apartments</h1>
-        <form id="location-form">
+        <form id="location-form" method="POST">
             <!-- Input Method Selection -->
             <label for="input-method">Choose Input Method:</label>
             <select id="input-method" name="input-method" required onchange="toggleInputFields()">
@@ -100,6 +100,23 @@
                 <option value="Pharmacies">Pharmacies</option>
                 <option value="Fitness Studios">Fitness Studios</option>
             </select>
+
+            <!-- Display Metro Station -->
+
+
+            <label for="display-metro">Display Metro Station:</label>
+            <div class="button-group">
+                <button type="button" id="metro-yes" class="metro-button" data-value="yes">Yes</button>
+                <button type="button" id="metro-no" class="metro-button" data-value="no">No</button>
+
+            </div>
+            <!-- Hidden input field to store the value -->
+            <input type="hidden" id="display-metro" name="display_metro" value="">
+
+
+
+
+
 
             <button type="submit">Search</button>
         </form>
@@ -286,6 +303,7 @@
 
             const preference1 = document.getElementById('preference1').value;
             const preference2 = document.getElementById('preference2').value;
+            const display_metro = document.getElementById('display-metro').value; // Get the value of the hidden input
 
             if (!latitude || !longitude) {
                 alert("Please provide valid latitude and longitude.");
@@ -296,7 +314,13 @@
                 const response = await fetch('/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `latitude=${latitude}&longitude=${longitude}&preference1=${preference1}&preference2=${preference2}`,
+                    body: new URLSearchParams({
+                        latitude: latitude,
+                        longitude: longitude,
+                        preference1: preference1,
+                        preference2: preference2,
+                        display_metro: display_metro, // Include display_metro
+                    }),
                 });
 
                 if (response.ok) {
@@ -315,6 +339,33 @@
                 console.error(error);
             }
         };
+
+
+
+
+        // When 'Yes' button is clicked
+        document.getElementById("metro-yes").addEventListener("click", function () {
+            const metroValue = this.getAttribute("data-value"); // Get the 'data-value' of the clicked button
+
+            document.getElementById("display-metro").value = metroValue; // Update hidden input value
+            this.classList.add("active"); // Highlight the selected button
+            document.getElementById("metro-no").classList.remove("active"); // Remove highlight from the other button
+        });
+
+        // When 'No' button is clicked
+        document.getElementById("metro-no").addEventListener("click", function () {
+            const metroValue = this.getAttribute("data-value"); // Get the 'data-value' of the clicked button
+
+            document.getElementById("display-metro").value = metroValue; // Update hidden input value
+            this.classList.add("active"); // Highlight the selected button
+            document.getElementById("metro-yes").classList.remove("active"); // Remove highlight from the other button
+        });
+
+
+
+
+
+
 
 
 
