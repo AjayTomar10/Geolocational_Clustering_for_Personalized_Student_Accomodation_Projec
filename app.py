@@ -140,11 +140,16 @@ def search():
 
         # Add metro station markers
         for _, metro in metro_stations.iterrows():
+            metro_location = (metro['location.lat'], metro['location.lng'])
+            distance = geodesic((latitude, longitude), metro_location).kilometers
+            popup_content = f"{metro['name']}</b><br>Distance: {distance:.2f} km"
+            popup = folium.Popup(popup_content, max_width=200, min_width=150)
+
             folium.Marker(
-            [metro['location.lat'], metro['location.lng']],
-            popup=f"<b>Metro Station: {metro['name']}</b>",
-            icon=folium.Icon(color="blue", icon="info-sign")
-        ).add_to(map_bang)
+                [metro['location.lat'], metro['location.lng']],
+                popup=popup,
+                icon=folium.Icon(color="blue", icon="info-sign")
+            ).add_to(map_bang)
 
     # Save map to an HTML file
     map_bang.save('templates/map.html')
