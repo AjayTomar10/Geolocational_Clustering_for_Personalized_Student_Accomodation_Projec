@@ -1,5 +1,5 @@
 // Hardcoded data for cities, colleges, and their lat/lng
-export const cityCollege = {
+const cityColleges = {
   bangalore: [
     { name: "IISc", lat: 13.021, lng: 77.566 },
     { name: "RVCE", lat: 12.923, lng: 77.5 },

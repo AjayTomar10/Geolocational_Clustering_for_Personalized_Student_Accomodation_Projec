@@ -1,6 +1,3 @@
-import { cityCollege } from './cityCollegeData.js'; // importing city and college names from script.js
-
-
 function populateColleges() {
   const city = document.getElementById("city").value;
   const collegeDropdown = document.getElementById("college");
